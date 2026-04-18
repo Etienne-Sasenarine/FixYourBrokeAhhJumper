@@ -25,7 +25,7 @@ def _write_mock_artifact(path: Path) -> None:
     path.write_bytes(base64.b64decode(png_b64))
 
 
-def _stub_analysis(image_path: str) -> ShotAnalysisResult:
+def _stub_analysis(video_path: str) -> ShotAnalysisResult:
     artifact = OUTPUT_DIR / "mock_release_frame.png"
     _write_mock_artifact(artifact)
 
@@ -43,13 +43,13 @@ def _stub_analysis(image_path: str) -> ShotAnalysisResult:
             },
             "error": False,
             "message": "",
-            "image_path": image_path,
+            "video_path": video_path,
         }
     )
 
 
-def _http_analysis(image_path: str, endpoint: str) -> ShotAnalysisResult:
-    payload = json.dumps({"image_path": image_path}).encode("utf-8")
+def _http_analysis(video_path: str, endpoint: str) -> ShotAnalysisResult:
+    payload = json.dumps({"video_path": video_path}).encode("utf-8")
     req = request.Request(
         endpoint,
         data=payload,
@@ -64,11 +64,9 @@ def _http_analysis(image_path: str, endpoint: str) -> ShotAnalysisResult:
     return normalize_analysis_result(data)
 
 
-def analyze_shot(image_path: str) -> ShotAnalysisResult:
-    """Adapter layer for Person 2's image engine.
+def analyze_shot(video_path: str) -> ShotAnalysisResult:
+    """Adapter layer for Person 2's engine.
 
-    Accepts a single image file or directory of images.
-    
     Priority:
     1) SHOT_ANALYZER_URL: call remote HTTP analyzer
     2) USE_STUB_DATA=1: use deterministic local stub
@@ -76,27 +74,20 @@ def analyze_shot(image_path: str) -> ShotAnalysisResult:
     """
     endpoint = os.getenv("SHOT_ANALYZER_URL", "").strip()
     if endpoint:
-        return _http_analysis(image_path=image_path, endpoint=endpoint)
+        return _http_analysis(video_path=video_path, endpoint=endpoint)
 
     if os.getenv("USE_STUB_DATA", "").strip() == "1":
-        return _stub_analysis(image_path=image_path)
+        return _stub_analysis(video_path=video_path)
 
     # Lazy import keeps HTTP/stub mode usable even if CV deps are not installed.
     try:
-        from pathlib import Path
-        path = Path(image_path)
-        
-        if path.is_dir():
-            from cv_engine.pipeline import analyze_shot_from_directory as cv_analyze_shot
-            result = cv_analyze_shot(image_path=image_path)
-        else:
-            from cv_engine.pipeline import analyze_shot_from_image as cv_analyze_shot
-            result = cv_analyze_shot(image_path=image_path)
-        
+        from cv_engine.pipeline import analyze_shot as cv_analyze_shot
+
+        result = cv_analyze_shot(video_path=video_path)
         return normalize_analysis_result(result)
     except Exception as exc:
         if os.getenv("FALLBACK_TO_STUB_ON_CV_ERROR", "1").strip() == "1":
-            return _stub_analysis(image_path=image_path)
+            return _stub_analysis(video_path=video_path)
 
         return normalize_analysis_result(
             {
