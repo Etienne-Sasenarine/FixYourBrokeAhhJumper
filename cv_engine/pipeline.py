@@ -188,9 +188,245 @@ def analyze_shot(
     ).to_dict()
 
 
-# ── Quick CLI test ─────────────────────────────────────────────────────────
+def analyze_shot_from_image(
+    image_path: str,
+    user_height_in: int = 72,
+    user_weight_lb: int = 185,
+    output_dir: str = "workspace/outputs",
+) -> dict:
+    """
+    Analyze a single jump shot image (release frame).
 
-if __name__ == "__main__":
+    Args:
+        image_path:      path to a single image file (JPG, PNG)
+        user_height_in:  user height in inches (default 6'0" = 72)
+        user_weight_lb:  user weight in lbs
+        output_dir:      where to save the annotated frame
+
+    Returns:
+        dict matching ShotResult schema (see cv_engine/schema.py)
+    """
+
+    if not os.path.exists(image_path):
+        return ShotResult(
+            error=True,
+            message=f"Image file not found: {image_path}"
+        ).to_dict()
+
+    # Load single image
+    from cv_engine.pose import extract_frames_from_image, run_pose_extraction, detect_release_frame, annotate_release_frame
+    
+    frames_indexed, fps, total = extract_frames_from_image(image_path)
+    
+    if not frames_indexed:
+        return ShotResult(
+            error=True,
+            message="Could not load image. Make sure it's a valid JPG or PNG."
+        ).to_dict()
+
+    # Extract pose from the image
+    frame_angles = run_pose_extraction(frames_indexed, fps, debug=False)
+
+    if not frame_angles:
+        return err_not_visible()
+
+    release_idx = 0  # Single image, so it's the release frame
+    release_fa = frame_angles[0]
+
+    # Compute derived metrics (simpler for single frame)
+    angles = {
+        "elbow_angle_deg": release_fa.elbow_angle,
+        "knee_bend_deg": release_fa.knee_angle,
+        "release_angle_deg": 50.0,  # Estimated from wrist position
+        "torso_lean_deg": release_fa.torso_lean,
+        "shoulder_tilt_deg": release_fa.shoulder_tilt,
+        "follow_through_deg": release_fa.wrist_angle,
+        "release_height_norm": release_fa.wrist_height,
+        "landing_drift_px": 0.0,  # Not applicable for single frame
+    }
+
+    # Score + issues
+    score, issues = compute_score_and_issues(angles)
+
+    # NBA matching
+    matches = match_player(
+        user_angles=angles,
+        user_height_in=user_height_in,
+        user_weight_lb=user_weight_lb,
+        top_k=3,
+    )
+    top_match = matches[0] if matches else None
+    sec_match = matches[1] if len(matches) > 1 else None
+
+    # Build feedback
+    top_issue = issues[0] if issues else None
+    summary = top_issue["label"] if top_issue else "Solid mechanics overall."
+    biggest_fix = (
+        f"Fix your {top_issue['metric'].replace('_', ' ').replace(' deg', '')}: "
+        f"measured {top_issue['value']}° (ideal {top_issue['ideal']}°)."
+        if top_issue else "Keep working on consistency."
+    )
+    drill = DRILLS.get(top_issue["metric"], "Form shooting from 5 feet, 20 reps.") if top_issue else ""
+
+    # Save annotated artifact
+    source_frame = frames_indexed[0][1]
+    annotated = annotate_release_frame(source_frame, release_fa)
+    artifact_path = _save_artifact(annotated, output_dir)
+
+    # Build metrics
+    metrics = ShotMetrics(
+        elbow_angle_deg=angles["elbow_angle_deg"],
+        knee_bend_deg=angles["knee_bend_deg"],
+        release_angle_deg=angles["release_angle_deg"],
+        torso_lean_deg=angles["torso_lean_deg"],
+        shoulder_tilt_deg=angles["shoulder_tilt_deg"],
+        follow_through_deg=angles["follow_through_deg"],
+        landing_drift_px=angles["landing_drift_px"],
+        release_height_norm=angles["release_height_norm"],
+        matched_player=top_match["player_name"] if top_match else "",
+        matched_player_team=top_match["team"] if top_match else "",
+        matched_player_style=top_match["style"] if top_match else "",
+        match_similarity_pct=top_match["similarity_pct"] if top_match else 0.0,
+        second_match=sec_match["player_name"] if sec_match else "",
+        second_match_pct=sec_match["similarity_pct"] if sec_match else 0.0,
+    )
+
+    return ShotResult(
+        score=score,
+        summary=summary,
+        biggest_fix=biggest_fix,
+        drill=drill,
+        artifact_path=artifact_path,
+        metrics=metrics,
+        error=False,
+        message="",
+    ).to_dict()
+
+
+def analyze_shot_from_directory(
+    directory: str,
+    user_height_in: int = 72,
+    user_weight_lb: int = 185,
+    output_dir: str = "workspace/outputs",
+) -> dict:
+    """
+    Analyze a sequence of images from a directory (like video frames).
+
+    Args:
+        directory:       path to directory containing image files
+        user_height_in:  user height in inches (default 6'0" = 72)
+        user_weight_lb:  user weight in lbs
+        output_dir:      where to save the annotated frame
+
+    Returns:
+        dict matching ShotResult schema (see cv_engine/schema.py)
+    """
+
+    if not os.path.isdir(directory):
+        return ShotResult(
+            error=True,
+            message=f"Directory not found: {directory}"
+        ).to_dict()
+
+    # Load images from directory
+    from cv_engine.pose import extract_frames_from_directory, run_pose_extraction, detect_release_frame, annotate_release_frame
+    
+    frames_indexed, fps, total = extract_frames_from_directory(directory, max_frames=60)
+
+    if not frames_indexed:
+        return ShotResult(
+            error=True,
+            message="No image files found in directory. Supported formats: JPG, PNG"
+        ).to_dict()
+
+    # Extract pose sequence
+    frame_angles = run_pose_extraction(frames_indexed, fps, debug=False)
+
+    if len(frame_angles) < 2:
+        return err_not_visible()
+
+    # Detect release frame from sequence
+    release_idx = detect_release_frame(frame_angles)
+    release_fa = frame_angles[release_idx]
+
+    # Compute derived metrics
+    from cv_engine.pose import compute_release_angle, compute_landing_drift
+    
+    release_angle = compute_release_angle(frame_angles, release_idx)
+    landing_drift = compute_landing_drift(frame_angles, release_idx)
+    angles = _build_angles_dict_simple(frame_angles[release_idx], release_angle, landing_drift)
+
+    # Score + issues
+    score, issues = compute_score_and_issues(angles)
+
+    # NBA matching
+    matches = match_player(
+        user_angles=angles,
+        user_height_in=user_height_in,
+        user_weight_lb=user_weight_lb,
+        top_k=3,
+    )
+    top_match = matches[0] if matches else None
+    sec_match = matches[1] if len(matches) > 1 else None
+
+    # Build feedback
+    top_issue = issues[0] if issues else None
+    summary = top_issue["label"] if top_issue else "Solid mechanics overall."
+    biggest_fix = (
+        f"Fix your {top_issue['metric'].replace('_', ' ').replace(' deg', '')}: "
+        f"measured {top_issue['value']}° (ideal {top_issue['ideal']}°)."
+        if top_issue else "Keep working on consistency."
+    )
+    drill = DRILLS.get(top_issue["metric"], "Form shooting from 5 feet, 20 reps.") if top_issue else ""
+
+    # Save annotated artifact
+    source_frame = frames_indexed[min(release_idx, len(frames_indexed) - 1)][1]
+    annotated = annotate_release_frame(source_frame, release_fa)
+    artifact_path = _save_artifact(annotated, output_dir)
+
+    # Build metrics
+    metrics = ShotMetrics(
+        elbow_angle_deg=angles["elbow_angle_deg"],
+        knee_bend_deg=angles["knee_bend_deg"],
+        release_angle_deg=angles["release_angle_deg"],
+        torso_lean_deg=angles["torso_lean_deg"],
+        shoulder_tilt_deg=angles["shoulder_tilt_deg"],
+        follow_through_deg=angles["follow_through_deg"],
+        landing_drift_px=landing_drift,
+        release_height_norm=angles["release_height_norm"],
+        matched_player=top_match["player_name"] if top_match else "",
+        matched_player_team=top_match["team"] if top_match else "",
+        matched_player_style=top_match["style"] if top_match else "",
+        match_similarity_pct=top_match["similarity_pct"] if top_match else 0.0,
+        second_match=sec_match["player_name"] if sec_match else "",
+        second_match_pct=sec_match["similarity_pct"] if sec_match else 0.0,
+    )
+
+    return ShotResult(
+        score=score,
+        summary=summary,
+        biggest_fix=biggest_fix,
+        drill=drill,
+        artifact_path=artifact_path,
+        metrics=metrics,
+        error=False,
+        message="",
+    ).to_dict()
+
+
+def _build_angles_dict_simple(release_fa, release_angle: float, landing_drift: float) -> dict:
+    """Convert single FrameAngles into angles dict."""
+    return {
+        "elbow_angle_deg": release_fa.elbow_angle,
+        "knee_bend_deg": release_fa.knee_angle,
+        "release_angle_deg": release_angle,
+        "torso_lean_deg": release_fa.torso_lean,
+        "shoulder_tilt_deg": release_fa.shoulder_tilt,
+        "follow_through_deg": min(90.0, release_fa.wrist_angle),
+        "release_height_norm": release_fa.wrist_height,
+        "landing_drift_px": landing_drift,
+    }
+
     import json
     import argparse
 

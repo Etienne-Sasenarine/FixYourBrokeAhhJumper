@@ -39,7 +39,7 @@ def main() -> None:
         "--attachment",
         action="append",
         default=[],
-        help="Absolute path to a downloaded video attachment. Can be passed multiple times.",
+        help="Absolute path to a downloaded image (JPG/PNG) or image directory. Can be passed multiple times.",
     )
     args = parser.parse_args()
 

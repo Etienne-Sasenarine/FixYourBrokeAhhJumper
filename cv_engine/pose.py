@@ -94,6 +94,47 @@ def extract_frames(video_path: str, max_frames: int = 60) -> tuple[list, float, 
     return frames, fps, total
 
 
+def extract_frames_from_image(image_path: str) -> tuple[list, float, int]:
+    """
+    Load a single image file. Returns (frames_bgr, fps=1.0, total_frame_count=1).
+    Treats the image as a single frame.
+    """
+    frame = cv2.imread(image_path)
+    if frame is None:
+        return [], 1.0, 0
+    
+    return [(0, frame)], 1.0, 1
+
+
+def extract_frames_from_directory(directory: str, max_frames: int = 60) -> tuple[list, float, int]:
+    """
+    Load all image files from a directory in alphanumeric order.
+    Returns (frames_bgr, fps=1.0, total_frame_count).
+    Treats images as a sequence of frames.
+    """
+    from pathlib import Path
+    
+    image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.mp4', '.avi'}
+    image_files = sorted([
+        f for f in Path(directory).iterdir() 
+        if f.suffix.lower() in image_extensions
+    ])
+    
+    if not image_files:
+        return [], 1.0, 0
+    
+    # Sample evenly if more than max_frames
+    sample_indices = np.linspace(0, len(image_files) - 1, min(max_frames, len(image_files)), dtype=int)
+    
+    frames = []
+    for idx in sample_indices:
+        frame = cv2.imread(str(image_files[idx]))
+        if frame is not None:
+            frames.append((idx, frame))
+    
+    return frames, 1.0, len(image_files)
+
+
 def _process_frame(frame_bgr: np.ndarray, pose, frame_idx: int, fps: float) -> Optional[FrameAngles]:
     """Run MediaPipe on one frame and return angles, or None if pose not detected."""
     rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)

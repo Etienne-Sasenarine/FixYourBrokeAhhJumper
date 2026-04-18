@@ -2,12 +2,23 @@
 
 AraShot MVP split for a 2-person hackathon team.
 
+## ✨ Update: Now Image-Based!
+
+The system now works with **images** instead of videos, making it compatible with Ara!
+
+- ✅ Single jump shot images (JPG, PNG)
+- ✅ Burst photo sequences from phone
+- ✅ Full pose analysis from static or sequential images
+- ✅ Perfect for iMessage attachment workflow
+
+See [IMAGE_MODE.md](IMAGE_MODE.md) for detailed usage.
+
 ## Person 1 scope (implemented)
 
 This repo now includes Person 1's orchestration layer:
 - message intake
-- attachment handling
-- saved clip path (`workspace/inbox/latest_shot.mp4`)
+- attachment handling (images or image directories)
+- saved image path (`workspace/inbox/latest_shot.jpg` or `latest_shot/`)
 - analyzer tool call
 - response formatting
 - artifact attach-back
@@ -16,11 +27,13 @@ This repo now includes Person 1's orchestration layer:
 
 ```
 ara_app/
-	app.py
-	handlers.py
+	app.py           (now accepts --image instead of --video)
+	handlers.py      (handles image attachments)
 	formatter.py
 	tools.py
 cv_engine/
+	pipeline.py      (new: analyze_shot_from_image, analyze_shot_from_directory)
+	pose.py          (new: extract_frames_from_image, extract_frames_from_directory)
 	README.md
 shared/
 	schema.py
@@ -32,16 +45,22 @@ workspace/
 ## How to run Person 1 demo
 
 1. Use Python 3.10+.
-2. Place any sample video on disk (for example: `C:\temp\shot.mp4`).
+2. Place any sample image on disk (JPG/PNG), for example: `C:\temp\shot.jpg`.
 3. Run:
 
 ```bash
-python -m ara_app.app --video C:\temp\shot.mp4 --sender "Ara Demo User"
+python -m ara_app.app --image "C:\temp\shot.jpg" --sender "Ara Demo User"
+```
+
+**Or use a folder of images (burst sequence):**
+
+```bash
+python -m ara_app.app --image "C:\temp\shot_images\" --sender "Ara Demo User"
 ```
 
 You should see:
 - an outbound coaching text
-- one attachment path (mock annotated frame)
+- one attachment path (annotated frame showing pose)
 
 ## Webhook mode for bridge integration
 
@@ -63,7 +82,7 @@ Incoming message contract (`POST /incoming`):
 {
 	"sender": "Ara Demo User",
 	"text": "shot check",
-	"attachments": ["C:/temp/shot.mp4"]
+	"attachments": ["C:/temp/shot.jpg"]
 }
 ```
 
@@ -73,7 +92,7 @@ Example PowerShell call:
 $body = @{
 	sender = "Ara Demo User"
 	text = "shot check"
-	attachments = @("C:/temp/shot.mp4")
+	attachments = @("C:/temp/shot.jpg")
 } | ConvertTo-Json
 
 Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8765/incoming" -ContentType "application/json" -Body $body
@@ -90,15 +109,21 @@ Use the bridge adapter when Ara or Linq downloads the iMessage attachment to a l
 
 Full field-by-field mapping spec: [docs/ara_linq_mapping.md](docs/ara_linq_mapping.md)
 
-Example:
+Example (single image):
 
 ```bash
-python -m ara_app.bridge --endpoint https://environment-hughes-starting-labs.trycloudflare.com/incoming --sender "Carl" --text "shot check" --attachment "C:\temp\shot.mp4"
+python -m ara_app.bridge --endpoint https://environment-hughes-starting-labs.trycloudflare.com/incoming --sender "Carl" --text "shot check" --attachment "C:\temp\shot.jpg"
+```
+
+Example (image directory / burst):
+
+```bash
+python -m ara_app.bridge --endpoint https://environment-hughes-starting-labs.trycloudflare.com/incoming --sender "Carl" --text "shot check" --attachment "C:\temp\shot_images"
 ```
 
 What this does:
 - builds the exact JSON payload the webhook expects
-- posts the downloaded video path to the public tunnel
+- posts the image(s) path to the public tunnel
 - prints the returned coaching response
 
 Use this same shape inside Ara/Linq:
