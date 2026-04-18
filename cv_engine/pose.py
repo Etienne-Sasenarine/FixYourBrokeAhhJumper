@@ -158,7 +158,7 @@ def _process_frame(frame_bgr: np.ndarray, pose, frame_idx: int, fps: float) -> O
     )
 
 
-def run_pose_extraction(frames_indexed: list, fps: float) -> list[FrameAngles]:
+def run_pose_extraction(frames_indexed: list, fps: float, debug: bool = False) -> list[FrameAngles]:
     """Run MediaPipe across all sampled frames."""
     results = []
     with mp_pose.Pose(
@@ -172,6 +172,31 @@ def run_pose_extraction(frames_indexed: list, fps: float) -> list[FrameAngles]:
             fa = _process_frame(frame, pose, idx, fps)
             if fa:
                 results.append(fa)
+            if debug:
+                debug_frame = frame.copy()
+                rgb = cv2.cvtColor(debug_frame, cv2.COLOR_BGR2RGB)
+                mp_results = pose.process(rgb)
+                
+                if mp_results.pose_landmarks:
+                    mp_drawing.draw_landmarks(
+                        debug_frame, 
+                        mp_results.pose_landmarks, 
+                        mp_pose.POSE_CONNECTIONS,
+                        landmark_drawing_spec=mp_drawing.DrawingSpec(color=(0, 255, 150), thickness=2, circle_radius=3),
+                        connection_drawing_spec=mp_drawing.DrawingSpec(color=(255, 255, 255), thickness=2)
+                    )
+                
+                # Resize window if the video is massive (e.g., 4K phone video)
+                h, w = debug_frame.shape[:2]
+                if h > 800:
+                    scale = 800 / h
+                    debug_frame = cv2.resize(debug_frame, (int(w * scale), 800))
+
+                cv2.imshow("MediaPipe Vision Stream", debug_frame)
+                cv2.waitKey(30) # Delay in ms to simulate video playback speed
+
+    if debug:
+        cv2.destroyAllWindows()
 
     return results
 

@@ -114,7 +114,7 @@ def analyze_shot(
         ).to_dict()
 
     # ── 2. Pose extraction ────────────────────────────────────────────────
-    pose_result = run_pose_pipeline(video_path, max_frames=60)
+    pose_result = run_pose_pipeline(video_path, max_frames=60, debug=True)
 
     if pose_result is None:
         return err_not_visible()
