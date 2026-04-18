@@ -67,11 +67,31 @@ def _http_analysis(video_path: str, endpoint: str) -> ShotAnalysisResult:
 def analyze_shot(video_path: str) -> ShotAnalysisResult:
     """Adapter layer for Person 2's engine.
 
-    If SHOT_ANALYZER_URL is set, this function calls that endpoint.
-    Otherwise it returns deterministic stub data for fast integration testing.
+    Priority:
+    1) SHOT_ANALYZER_URL: call remote HTTP analyzer
+    2) USE_STUB_DATA=1: use deterministic local stub
+    3) Default: call local cv_engine.pipeline analyzer
     """
     endpoint = os.getenv("SHOT_ANALYZER_URL", "").strip()
     if endpoint:
         return _http_analysis(video_path=video_path, endpoint=endpoint)
 
-    return _stub_analysis(video_path=video_path)
+    if os.getenv("USE_STUB_DATA", "").strip() == "1":
+        return _stub_analysis(video_path=video_path)
+
+    # Lazy import keeps HTTP/stub mode usable even if CV deps are not installed.
+    try:
+        from cv_engine.pipeline import analyze_shot as cv_analyze_shot
+
+        result = cv_analyze_shot(video_path=video_path)
+        return normalize_analysis_result(result)
+    except Exception as exc:
+        if os.getenv("FALLBACK_TO_STUB_ON_CV_ERROR", "1").strip() == "1":
+            return _stub_analysis(video_path=video_path)
+
+        return normalize_analysis_result(
+            {
+                "error": True,
+                "message": f"CV pipeline unavailable: {exc}",
+            }
+        )

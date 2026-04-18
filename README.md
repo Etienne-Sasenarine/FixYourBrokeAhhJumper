@@ -86,8 +86,8 @@ The response payload is your outbound message structure:
 
 ## Analyzer integration modes
 
-### Mode A: stub (default)
-No setup needed. Person 1 flow works with deterministic fake analysis.
+### Mode A: real Person 2 engine (default local)
+No environment variable is needed. Person 1 now calls `cv_engine.pipeline.analyze_shot()` directly.
 
 ### Mode B: real Person 2 engine (HTTP)
 Set:
@@ -102,6 +102,13 @@ Then run the same Person 1 command. The app will POST:
 {
 	"video_path": ".../workspace/inbox/latest_shot.mp4"
 }
+```
+
+### Mode C: deterministic stub (for fast UI testing)
+Set:
+
+```bash
+set USE_STUB_DATA=1
 ```
 
 ## Shared output contract

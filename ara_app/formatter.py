@@ -1,15 +1,20 @@
 from __future__ import annotations
 
+from numbers import Number
+
 from shared.schema import ShotAnalysisResult
 
 
-def format_metrics(metrics: dict[str, float]) -> str:
+def format_metrics(metrics: dict[str, object]) -> str:
     if not metrics:
         return ""
     pieces = []
     for key, value in metrics.items():
         label = key.replace("_", " ")
-        pieces.append(f"- {label}: {value:.1f}")
+        if isinstance(value, Number):
+            pieces.append(f"- {label}: {float(value):.1f}")
+        elif isinstance(value, str) and value:
+            pieces.append(f"- {label}: {value}")
     return "\n".join(pieces)
 
 
