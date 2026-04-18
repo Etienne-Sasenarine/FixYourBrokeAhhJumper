@@ -11,7 +11,7 @@ Person 1 calls ONE function:
         user_weight_lb=180,
     )
 
-Returns a dict matching shared/schema.py ShotResult.
+Returns a dict matching cv_engine/schema.py ShotResult.
 
 Person 1 never imports anything else from cv_engine.
 """
@@ -28,7 +28,7 @@ from cv_engine.pose    import run_pose_pipeline, compute_release_angle, compute_
 from cv_engine.matcher import match_player
 from cv_engine.metrics import compute_score_and_issues
 from cv_engine.database import FEATURE_KEYS
-from shared.schema     import ShotResult, ShotMetrics, err_not_visible, err_no_shot_detected
+from cv_engine.schema   import ShotResult, ShotMetrics, err_not_visible, err_no_shot_detected
 
 
 # Drill library — keyed by metric name
@@ -103,7 +103,7 @@ def analyze_shot(
         output_dir:      where to save the annotated frame
 
     Returns:
-        dict matching ShotResult schema (see shared/schema.py)
+        dict matching ShotResult schema (see cv_engine/schema.py)
     """
 
     # ── 1. Validate input ─────────────────────────────────────────────────
