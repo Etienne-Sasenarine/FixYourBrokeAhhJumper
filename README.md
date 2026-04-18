@@ -84,10 +84,43 @@ The response payload is your outbound message structure:
 - text
 - attachments
 
+## Step 3: Bridge the phone to the webhook
+
+Use the bridge adapter when Ara or Linq downloads the iMessage attachment to a local path.
+
+Full field-by-field mapping spec: [docs/ara_linq_mapping.md](docs/ara_linq_mapping.md)
+
+Example:
+
+```bash
+python -m ara_app.bridge --endpoint https://environment-hughes-starting-labs.trycloudflare.com/incoming --sender "Carl" --text "shot check" --attachment "C:\temp\shot.mp4"
+```
+
+What this does:
+- builds the exact JSON payload the webhook expects
+- posts the downloaded video path to the public tunnel
+- prints the returned coaching response
+
+Use this same shape inside Ara/Linq:
+
+```json
+{
+	"sender": "Carl",
+	"text": "shot check",
+	"attachments": ["C:/temp/shot.mp4"]
+}
+```
+
+If you are wiring Ara/Linq directly, the bridge steps are:
+- detect incoming iMessage with video attachment
+- save the attachment to a local absolute path
+- call the webhook with sender, text, and attachments
+- forward the returned `text` and `attachments` back to the iMessage thread
+
 ## Analyzer integration modes
 
-### Mode A: stub (default)
-No setup needed. Person 1 flow works with deterministic fake analysis.
+### Mode A: real Person 2 engine (default local)
+No environment variable is needed. Person 1 now calls `cv_engine.pipeline.analyze_shot()` directly.
 
 ### Mode B: real Person 2 engine (HTTP)
 Set:
@@ -102,6 +135,13 @@ Then run the same Person 1 command. The app will POST:
 {
 	"video_path": ".../workspace/inbox/latest_shot.mp4"
 }
+```
+
+### Mode C: deterministic stub (for fast UI testing)
+Set:
+
+```bash
+set USE_STUB_DATA=1
 ```
 
 ## Shared output contract
@@ -147,6 +187,7 @@ Failure example:
 - `ara_app/formatter.py`: concise coaching message format
 - `ara_app/app.py`: local CLI demo entrypoint
 - `ara_app/webhook.py`: HTTP endpoint for incoming bridge messages
+- `ara_app/bridge.py`: CLI bridge adapter that posts to the webhook
 - `shared/schema.py`: handshake schema and normalizer
 
 ## Tests
