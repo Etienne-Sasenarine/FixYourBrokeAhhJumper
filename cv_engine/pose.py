@@ -328,7 +328,7 @@ def annotate_release_frame(frame_bgr: np.ndarray, release_fa: FrameAngles) -> np
 
 # ── Main entry ────────────────────────────────────────────────────────────
 
-def run_pose_pipeline(video_path: str, max_frames: int = 60) -> Optional[PoseResult]:
+def run_pose_pipeline(video_path: str, max_frames: int = 60, debug: bool = False) -> Optional[PoseResult]:
     """
     Full pipeline: video → PoseResult with release frame angles + annotated image.
     Returns None if pose cannot be reliably detected.
@@ -338,7 +338,7 @@ def run_pose_pipeline(video_path: str, max_frames: int = 60) -> Optional[PoseRes
     if not frames_indexed:
         return None
 
-    frame_angles = run_pose_extraction(frames_indexed, fps)
+    frame_angles = run_pose_extraction(frames_indexed, fps, debug=debug)
 
     # Need at least 5 good frames
     if len(frame_angles) < 5:
