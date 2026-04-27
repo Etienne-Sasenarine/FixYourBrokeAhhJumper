@@ -1,6 +1,6 @@
 
 # FixYourBrokeAhhJumper
-## Winner of Most Technical @ Ara (YC P26) x Conrell Hackathon
+## Winner of Most Technical @ Ara (YC P26) x Cornell Hackathon
 
 FixYourBrokeAhhJumper is an MVP project for automated basketball shot analysis. It processes video clips, analyzes shooting form, and returns actionable coaching feedback. Built for a 2-person hackathon, this project demonstrates modular orchestration, computer vision, and messaging integration.
 
