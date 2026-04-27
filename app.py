@@ -1,1 +1,0 @@
-# app and ara integration
