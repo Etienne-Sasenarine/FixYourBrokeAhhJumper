@@ -11,13 +11,13 @@ def test_no_video_attachment_returns_prompt() -> None:
     out = process_incoming_message(incoming)
 
     assert out.recipient == "Ara User"
-    assert "Please send a jump-shot video" in out.text
+    assert "Please send a jump-shot image" in out.text
     assert out.attachments == []
 
 
 def test_process_video_attachment_roundtrip(tmp_path: Path) -> None:
-    src = tmp_path / "clip.mp4"
-    src.write_bytes(b"fake video")
+    src = tmp_path / "shot.jpg"
+    src.write_bytes(b"fake image")
 
     incoming = IncomingMessage(sender="Ara User", text="check shot", attachments=[str(src)])
     out = process_incoming_message(incoming)
