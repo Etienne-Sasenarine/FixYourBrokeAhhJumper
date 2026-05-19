@@ -3,7 +3,7 @@
 ## Winner of Most Technical @ Ara (YC P26) x Cornell Hackathon
 
 
-Have you ever been at the gym with your homeboy and been like, "Wow, your jumper sucks"? Now introducing FixYourBrokeAhhJumper! Based on metrics by your favorite players like Lebron James, Stephen Curry, and Donovan Mitchell, we use computer vision and frame-by-frame analysis to suggest form adjustments and drills. You receive on-demand feedback right on the court--just as if you were texting a friend.
+Have you ever been at the gym with your homeboy and thought, “Wow, your jumper sucks”? Now introducing FixYourBrokeAhhJumper! Based on metrics from your favorite players like LeBron James, Stephen Curry, and Donovan Mitchell, we use computer vision and frame-by-frame analysis to suggest form adjustments and drills. You receive on-demand feedback right on the court—just as if you were texting a friend.
 
 FixYourBrokeAhhJumper is a project for automated basketball shot analysis. It processes video clips, analyzes shooting form, and returns actionable coaching feedback. This project demonstrates modular orchestration, computer vision, and messaging integration.
 
